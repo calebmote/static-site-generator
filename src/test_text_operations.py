@@ -1,6 +1,6 @@
 import unittest
 from textnode import TextNode, textType
-from text_operations import split_nodes_delimiter, extract_markdown_images, extract_markdown_links, split_nodes_image, split_nodes_link, text_to_textnodes
+from text_operations import split_nodes_delimiter, extract_markdown_images, extract_markdown_links, split_nodes_image, split_nodes_link, text_to_textnodes, markdown_to_blocks, BlockType, block_to_block_type
 
 
 class TestSplitNodesDelimiter(unittest.TestCase):
@@ -486,6 +486,183 @@ class TestTextToTextNodes(unittest.TestCase):
             TextNode("link", textType.LINK, "https://example.com"),
         ]
         self.assertListEqual(expected, nodes)
+
+
+class TestMarkdownToBlocks(unittest.TestCase):
+    def test_markdown_to_blocks(self):
+        md = """
+This is **bolded** paragraph
+
+This is another paragraph with _italic_ text and `code` here
+This is the same paragraph on a new line
+
+- This is a list
+- with items
+"""
+        blocks = markdown_to_blocks(md)
+        self.assertEqual(
+            blocks,
+            [
+                "This is **bolded** paragraph",
+                "This is another paragraph with _italic_ text and `code` here\nThis is the same paragraph on a new line",
+                "- This is a list\n- with items",
+            ],
+        )
+
+    def test_markdown_to_blocks_empty(self):
+        md = ""
+        blocks = markdown_to_blocks(md)
+        self.assertEqual([], blocks)
+
+    def test_markdown_to_blocks_only_newlines(self):
+        md = "\n\n\n"
+        blocks = markdown_to_blocks(md)
+        self.assertEqual([], blocks)
+
+    def test_markdown_to_blocks_single_block(self):
+        md = "This is a single block"
+        blocks = markdown_to_blocks(md)
+        self.assertEqual(["This is a single block"], blocks)
+
+    def test_markdown_to_blocks_with_leading_trailing_whitespace(self):
+        md = """
+        
+# This is a heading
+
+This is a paragraph with leading and trailing spaces
+
+        
+        """
+        blocks = markdown_to_blocks(md)
+        self.assertEqual(
+            [
+                "# This is a heading",
+                "This is a paragraph with leading and trailing spaces",
+            ],
+            blocks,
+        )
+
+    def test_markdown_to_blocks_multiple_empty_lines(self):
+        md = "First block\n\n\n\nSecond block\n\n\nThird block"
+        blocks = markdown_to_blocks(md)
+        self.assertEqual(
+            ["First block", "Second block", "Third block"],
+            blocks,
+        )
+
+    def test_markdown_to_blocks_complex(self):
+        md = """
+# Heading
+
+This is a paragraph.
+
+## Subheading
+
+- List item 1
+- List item 2
+
+Another paragraph.
+"""
+        blocks = markdown_to_blocks(md)
+        self.assertEqual(
+            [
+                "# Heading",
+                "This is a paragraph.",
+                "## Subheading",
+                "- List item 1\n- List item 2",
+                "Another paragraph.",
+            ],
+            blocks)
+
+
+class TestBlockToBlockType(unittest.TestCase):
+    def test_heading(self):
+        block = "# This is a heading"
+        self.assertEqual(block_to_block_type(block), BlockType.HEADING)
+        
+        block = "## This is a level 2 heading"
+        self.assertEqual(block_to_block_type(block), BlockType.HEADING)
+        
+        block = "###### This is a level 6 heading"
+        self.assertEqual(block_to_block_type(block), BlockType.HEADING)
+
+    def test_code(self):
+        block = "```\ncode block\n```"
+        self.assertEqual(block_to_block_type(block), BlockType.CODE)
+        
+        block = "```\nprint('hello')\nprint('world')\n```"
+        self.assertEqual(block_to_block_type(block), BlockType.CODE)
+
+    def test_quote(self):
+        block = "> This is a quote"
+        self.assertEqual(block_to_block_type(block), BlockType.QUOTE)
+        
+        block = "> This is a quote\n> with multiple lines"
+        self.assertEqual(block_to_block_type(block), BlockType.QUOTE)
+        
+        block = ">No space after >"
+        self.assertEqual(block_to_block_type(block), BlockType.QUOTE)
+
+    def test_unordered_list(self):
+        block = "- Item 1"
+        self.assertEqual(block_to_block_type(block), BlockType.UNORDERED_LIST)
+        
+        block = "- Item 1\n- Item 2\n- Item 3"
+        self.assertEqual(block_to_block_type(block), BlockType.UNORDERED_LIST)
+
+    def test_ordered_list(self):
+        block = "1. Item 1"
+        self.assertEqual(block_to_block_type(block), BlockType.ORDERED_LIST)
+        
+        block = "1. Item 1\n2. Item 2\n3. Item 3"
+        self.assertEqual(block_to_block_type(block), BlockType.ORDERED_LIST)
+
+    def test_paragraph(self):
+        block = "This is a normal paragraph"
+        self.assertEqual(block_to_block_type(block), BlockType.PARAGRAPH)
+        
+        block = "This is a paragraph\nwith multiple lines"
+        self.assertEqual(block_to_block_type(block), BlockType.PARAGRAPH)
+
+    def test_invalid_heading_no_space(self):
+        block = "#No space after hash"
+        self.assertEqual(block_to_block_type(block), BlockType.PARAGRAPH)
+
+    def test_invalid_code_unclosed(self):
+        block = "```\nunclosed code block"
+        self.assertEqual(block_to_block_type(block), BlockType.PARAGRAPH)
+
+    def test_invalid_quote_mixed_lines(self):
+        block = "> This is a quote\nThis is not a quote"
+        self.assertEqual(block_to_block_type(block), BlockType.PARAGRAPH)
+
+    def test_invalid_unordered_list_no_space(self):
+        block = "-No space after dash"
+        self.assertEqual(block_to_block_type(block), BlockType.PARAGRAPH)
+
+    def test_invalid_unordered_list_mixed_lines(self):
+        block = "- Item 1\nNot a list item\n- Item 3"
+        self.assertEqual(block_to_block_type(block), BlockType.PARAGRAPH)
+
+    def test_invalid_ordered_list_wrong_numbers(self):
+        block = "1. Item 1\n3. Item 2\n4. Item 3"
+        self.assertEqual(block_to_block_type(block), BlockType.PARAGRAPH)
+        
+        block = "2. Item 1\n3. Item 2\n4. Item 3"
+        self.assertEqual(block_to_block_type(block), BlockType.PARAGRAPH)
+
+    def test_invalid_ordered_list_no_space(self):
+        block = "1.No space after dot"
+        self.assertEqual(block_to_block_type(block), BlockType.PARAGRAPH)
+
+    def test_edge_cases(self):
+        # Empty block should be paragraph
+        block = ""
+        self.assertEqual(block_to_block_type(block), BlockType.PARAGRAPH)
+        
+        # More than 6 # characters should be paragraph
+        block = "####### Too many hashes"
+        self.assertEqual(block_to_block_type(block), BlockType.PARAGRAPH)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,15 @@
 from textnode import TextNode, textType
 import re
+from enum import Enum
+
+
+class BlockType(Enum):
+    PARAGRAPH = "paragraph"
+    HEADING = "heading"
+    CODE = "code"
+    QUOTE = "quote"
+    UNORDERED_LIST = "unordered_list"
+    ORDERED_LIST = "ordered_list"
 
 
 def split_nodes_delimiter(old_nodes, delimiter, text_type):
@@ -123,3 +133,52 @@ def text_to_textnodes(text):
     nodes = split_nodes_delimiter(nodes, "**", textType.BOLD)
     
     return nodes
+
+
+def markdown_to_blocks(markdown):
+    blocks = markdown.split("\n\n")
+    
+    # Strip leading/trailing whitespace from each block
+    stripped_blocks = []
+    for block in blocks:
+        stripped = block.strip()
+        if stripped:  # Only add non-empty blocks
+            stripped_blocks.append(stripped)
+    
+    return stripped_blocks
+
+
+def block_to_block_type(block):
+    lines = block.split("\n")
+    
+    # Check for heading (1-6 # characters followed by space)
+    if re.match(r"^#{1,6}\s", block):
+        return BlockType.HEADING
+    
+    # Check for code block (starts and ends with 3 backticks)
+    if block.startswith("```") and block.endswith("```"):
+        return BlockType.CODE
+    
+    # Check for quote block (every line starts with >)
+    if all(line.startswith(">") for line in lines):
+        return BlockType.QUOTE
+    
+    # Check for unordered list (every line starts with - followed by space)
+    if all(re.match(r"^\-\s", line) for line in lines):
+        return BlockType.UNORDERED_LIST
+    
+    # Check for ordered list (every line starts with number. followed by space, starting at 1)
+    ordered_pattern = re.compile(r"^(\d+)\.\s")
+    if all(ordered_pattern.match(line) for line in lines):
+        numbers = []
+        for line in lines:
+            match = ordered_pattern.match(line)
+            if match:
+                numbers.append(int(match.group(1)))
+        
+        # Check if numbers start at 1 and increment by 1
+        if numbers == list(range(1, len(numbers) + 1)):
+            return BlockType.ORDERED_LIST
+    
+    # Default to paragraph
+    return BlockType.PARAGRAPH
