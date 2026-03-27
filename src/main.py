@@ -1,7 +1,7 @@
 import os
 from textnode import TextNode, textType
 from file_utils import copy_directory_recursive
-from page_generator import generate_page
+from page_generator import generate_pages_recursive
 
 
 def main():
@@ -13,13 +13,12 @@ def main():
     copy_directory_recursive(static_path, public_path)
     print("Static files copied successfully!")
     
-    # Generate HTML page
-    content_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "content", "index.md")
+    # Generate HTML pages recursively
+    content_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "content")
     template_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "template.html")
-    dest_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "public", "index.html")
     
-    generate_page(content_path, template_path, dest_path)
-    print("Page generated successfully!")
+    generate_pages_recursive(content_path, template_path, public_path)
+    print("Pages generated successfully!")
 
 
 if __name__ == "__main__":
