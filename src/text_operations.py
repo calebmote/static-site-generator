@@ -182,3 +182,12 @@ def block_to_block_type(block):
     
     # Default to paragraph
     return BlockType.PARAGRAPH
+
+
+def extract_title(markdown):
+    lines = markdown.split('\n')
+    for line in lines:
+        if line.strip().startswith('# '):
+            return line.strip().lstrip('# ').strip()
+    
+    raise ValueError("No h1 header found in markdown")
